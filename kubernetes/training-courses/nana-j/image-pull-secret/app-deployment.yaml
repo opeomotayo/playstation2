@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  labels:
+    app: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      imagePullSecrets:
+        - name: my-registry-key2
+      containers:
+        - name: my-app
+          image: opeomotayo/my-app:2.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000

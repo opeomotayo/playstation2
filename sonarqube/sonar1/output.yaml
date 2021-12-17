@@ -1,0 +1,355 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    checksum/config: b27869e825866530047d3dcfaa06734bcd5c54879e41aafa70075271f6c40b46
+    checksum/init-fs: 4337045efb35c150b16ecb91f6f8e2535fce4df38d60bf1a3be57617567d4055
+    checksum/init-sysctl: 3ba132474872a1e5e80acec2d6522df0595ffe3f83f09fb30583bf53ad518683
+    checksum/plugins: 727b8ec33eb614c435aea66c8aff3fb4a3fc256b3049a459536d3cfe6c286088
+    checksum/prometheus-ce-config: 84b3eda9192330a4a6bccb0f32820e8eac0fee15f547c09ffd672c95557571f9
+    checksum/prometheus-config: dcc190ab1a83bbde9009bd8c74770a72bf98485e2e263b598824d2d2e7770c89
+    checksum/secret: a926f474c40e85deb887def7648b847df9018fec85428d0fc7bcbe4038ca415d
+  creationTimestamp: "2021-09-27T21:17:20Z"
+  generateName: sonarqube-sonarqube-
+  labels:
+    app: sonarqube
+    controller-revision-hash: sonarqube-sonarqube-6ff76ddd87
+    release: sonarqube
+    statefulset.kubernetes.io/pod-name: sonarqube-sonarqube-0
+  name: sonarqube-sonarqube-0
+  namespace: sonarqube
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: StatefulSet
+    name: sonarqube-sonarqube
+    uid: 05f1fcf8-b466-4121-80d3-35079aaa84b3
+  resourceVersion: "275091"
+  uid: b9ed6354-bb73-40c1-ba2a-65baae168ea8
+spec:
+  containers:
+  - env:
+    - name: SONAR_WEB_JAVAOPTS
+      value: -javaagent:/opt/sonarqube/data/jmx_prometheus_javaagent.jar=8000:/opt/sonarqube/conf/prometheus-config.yaml
+    - name: SONAR_CE_JAVAOPTS
+      value: -javaagent:/opt/sonarqube/data/jmx_prometheus_javaagent.jar=8001:/opt/sonarqube/conf/prometheus-ce-config.yaml
+    - name: SONAR_JDBC_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: postgresql-password
+          name: sonarqube-postgresql
+    - name: SONAR_WEB_SYSTEMPASSCODE
+      valueFrom:
+        secretKeyRef:
+          key: SONAR_WEB_SYSTEMPASSCODE
+          name: sonarqube-sonarqube-monitoring-passcode
+    envFrom:
+    - configMapRef:
+        name: sonarqube-sonarqube-jdbc-config
+    image: sonarqube:9.1.0-community
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      exec:
+        command:
+        - sh
+        - -c
+        - "#!/bin/bash\n# A Sonarqube container is considered healthy if the health
+          status is GREEN or YELLOW\nhost=\"$(hostname -i || echo '127.0.0.1')\"\nif
+          wget --header=\"X-Sonar-Passcode: ${SONAR_WEB_SYSTEMPASSCODE}\" -qO- http://${host}:9000/api/system/health
+          | grep -q -e '\"health\":\"GREEN\"' -e '\"health\":\"YELLOW\"'; then\n\texit
+          0\nfi\nexit 1\n"
+      failureThreshold: 3
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      successThreshold: 1
+      timeoutSeconds: 1
+    name: sonarqube
+    ports:
+    - containerPort: 9000
+      name: http
+      protocol: TCP
+    - containerPort: 8000
+      name: monitoring-web
+      protocol: TCP
+    - containerPort: 8001
+      name: monitoring-ce
+      protocol: TCP
+    readinessProbe:
+      exec:
+        command:
+        - sh
+        - -c
+        - "#!/bin/bash\n# A Sonarqube container is considered ready if the status
+          is UP, DB_MIGRATION_NEEDED or DB_MIGRATION_RUNNING\n# status about migration
+          are added to prevent the node to be kill while sonarqube is upgrading the
+          database.\nhost=\"$(hostname -i || echo '127.0.0.1')\"\nif wget -qO- http://${host}:9000/api/system/status
+          | grep -q -e '\"status\":\"UP\"' -e '\"status\":\"DB_MIGRATION_NEEDED\"'
+          -e '\"status\":\"DB_MIGRATION_RUNNING\"'; then\n\texit 0\nfi\nexit 1\n"
+      failureThreshold: 6
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      successThreshold: 1
+      timeoutSeconds: 1
+    resources:
+      limits:
+        cpu: 800m
+        memory: 4Gi
+      requests:
+        cpu: 400m
+        memory: 2Gi
+    securityContext:
+      runAsUser: 1000
+    startupProbe:
+      failureThreshold: 24
+      httpGet:
+        path: /api/system/status
+        port: 9000
+        scheme: HTTP
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /opt/sonarqube/data
+      name: sonarqube
+      subPath: data
+    - mountPath: /opt/sonarqube/temp
+      name: sonarqube
+      subPath: temp
+    - mountPath: /opt/sonarqube/logs
+      name: sonarqube
+      subPath: logs
+    - mountPath: /tmp
+      name: tmp-dir
+    - mountPath: /opt/sonarqube/conf/prometheus-config.yaml
+      name: prometheus-config
+      subPath: prometheus-config.yaml
+    - mountPath: /opt/sonarqube/conf/prometheus-ce-config.yaml
+      name: prometheus-ce-config
+      subPath: prometheus-ce-config.yaml
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-59lq9
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  hostname: sonarqube-sonarqube-0
+  initContainers:
+  - command:
+    - /bin/sh
+    - -c
+    - for i in $(seq 1 200); do nc -z -w3 sonarqube-postgresql 5432 && exit 0 || sleep
+      2; done; exit 1
+    image: busybox:1.32
+    imagePullPolicy: IfNotPresent
+    name: wait-for-db
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-59lq9
+      readOnly: true
+  - command:
+    - sh
+    - -e
+    - /tmp/scripts/init_sysctl.sh
+    image: busybox:1.32
+    imagePullPolicy: IfNotPresent
+    name: init-sysctl
+    resources: {}
+    securityContext:
+      privileged: true
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /tmp/scripts/
+      name: init-sysctl
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-59lq9
+      readOnly: true
+  - args:
+    - curl -s 'https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.0/jmx_prometheus_javaagent-0.16.0.jar'  --output
+      /data/jmx_prometheus_javaagent.jar -v
+    command:
+    - /bin/sh
+    - -c
+    env:
+    - name: http_proxy
+    - name: https_proxy
+    - name: no_proxy
+    image: curlimages/curl:7.76.1
+    imagePullPolicy: IfNotPresent
+    name: inject-prometheus-exporter
+    resources: {}
+    securityContext:
+      runAsGroup: 0
+      runAsUser: 0
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /data
+      name: sonarqube
+      subPath: data
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-59lq9
+      readOnly: true
+  nodeName: docker-desktop
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  subdomain: sonarqube-sonarqube
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: init_sysctl.sh
+        path: init_sysctl.sh
+      name: sonarqube-sonarqube-init-sysctl
+    name: init-sysctl
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: init_fs.sh
+        path: init_fs.sh
+      name: sonarqube-sonarqube-init-fs
+    name: init-fs
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: install_plugins.sh
+        path: install_plugins.sh
+      name: sonarqube-sonarqube-install-plugins
+    name: install-plugins
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: prometheus-config.yaml
+        path: prometheus-config.yaml
+      name: sonarqube-sonarqube-prometheus-config
+    name: prometheus-config
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: prometheus-ce-config.yaml
+        path: prometheus-ce-config.yaml
+      name: sonarqube-sonarqube-prometheus-ce-config
+    name: prometheus-ce-config
+  - emptyDir: {}
+    name: sonarqube
+  - emptyDir: {}
+    name: tmp-dir
+  - name: kube-api-access-59lq9
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2021-09-27T21:17:49Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2021-09-27T21:20:20Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2021-09-27T21:20:20Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2021-09-27T21:17:20Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: docker://161529a001d8cacf07ca221055ee85d8d4dc481c9c8dd23bded1600b084d23df
+    image: sonarqube:9.1.0-community
+    imageID: docker-pullable://sonarqube@sha256:8cd6eb50928245ea409d61cdc49f613d847605eb324736fad096ce494d2d42c9
+    lastState: {}
+    name: sonarqube
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2021-09-27T21:17:51Z"
+  hostIP: 192.168.65.4
+  initContainerStatuses:
+  - containerID: docker://39e3ca9fdfb20c918fe34e6f8763c7fcd148aa7b627293c2b4c9975947234b13
+    image: busybox:1.32
+    imageID: docker-pullable://busybox@sha256:ae39a6f5c07297d7ab64dbd4f82c77c874cc6a94cea29fdec309d0992574b4f7
+    lastState: {}
+    name: wait-for-db
+    ready: true
+    restartCount: 0
+    state:
+      terminated:
+        containerID: docker://39e3ca9fdfb20c918fe34e6f8763c7fcd148aa7b627293c2b4c9975947234b13
+        exitCode: 0
+        finishedAt: "2021-09-27T21:17:42Z"
+        reason: Completed
+        startedAt: "2021-09-27T21:17:24Z"
+  - containerID: docker://612367d968f438dfdcfee2fa93a21008308537f8ce29e45964d4efbdd150a558
+    image: busybox:1.32
+    imageID: docker-pullable://busybox@sha256:ae39a6f5c07297d7ab64dbd4f82c77c874cc6a94cea29fdec309d0992574b4f7
+    lastState: {}
+    name: init-sysctl
+    ready: true
+    restartCount: 0
+    state:
+      terminated:
+        containerID: docker://612367d968f438dfdcfee2fa93a21008308537f8ce29e45964d4efbdd150a558
+        exitCode: 0
+        finishedAt: "2021-09-27T21:17:43Z"
+        reason: Completed
+        startedAt: "2021-09-27T21:17:43Z"
+  - containerID: docker://009db7e40db312444a562330427bce02adc79a4056580cdc7e225efe99c99ce7
+    image: curlimages/curl:7.76.1
+    imageID: docker-pullable://curlimages/curl@sha256:fa32ef426092b88ee0b569d6f81ab0203ee527692a94ec2e6ceb2fd0b6b2755c
+    lastState: {}
+    name: inject-prometheus-exporter
+    ready: true
+    restartCount: 0
+    state:
+      terminated:
+        containerID: docker://009db7e40db312444a562330427bce02adc79a4056580cdc7e225efe99c99ce7
+        exitCode: 0
+        finishedAt: "2021-09-27T21:17:49Z"
+        reason: Completed
+        startedAt: "2021-09-27T21:17:49Z"
+  phase: Running
+  podIP: 10.1.1.80
+  podIPs:
+  - ip: 10.1.1.80
+  qosClass: Burstable
+  startTime: "2021-09-27T21:17:20Z"

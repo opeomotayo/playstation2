@@ -1,0 +1,203 @@
+# Source: jenkins/templates/jcasc-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jenkins-jenkins-jcasc-config
+  namespace: jenkins
+  labels:
+    "app.kubernetes.io/name": jenkins
+    "helm.sh/chart": "jenkins-3.7.0"
+    "app.kubernetes.io/managed-by": "Helm"
+    "app.kubernetes.io/instance": "jenkins"
+    "app.kubernetes.io/component": "jenkins-controller"
+    jenkins-jenkins-config: "true"
+data:
+  jcasc-default-config.yaml: |-
+    jenkins:
+      agentProtocols:
+      - "JNLP4-connect"
+      - "Ping"
+      authorizationStrategy:
+        loggedInUsersCanDoAnything:
+          allowAnonymousRead: false
+      clouds:
+      - kubernetes:
+          containerCap: 10
+          containerCapStr: "10"
+          jenkinsTunnel: "jenkins-agent.jenkins.svc.cluster.local:50000"
+          jenkinsUrl: "http://jenkins.jenkins.svc.cluster.local:8080"
+          name: "kubernetes"
+          namespace: "jenkins"
+          podLabels:
+          - key: "jenkins/jenkins-jenkins-agent"
+            value: "true"
+          serverUrl: "https://kubernetes.default"
+          templates:
+          - containers:
+            - args: "^${computer.jnlpmac} ^${computer.name}"
+              envVars:
+              - envVar:
+                  key: "JENKINS_URL"
+                  value: "http://jenkins.jenkins.svc.cluster.local:8080/"
+              image: "jenkins/inbound-agent:4.6-1"
+              name: "jnlp"
+              resourceLimitCpu: "512m"
+              resourceLimitMemory: "512Mi"
+              resourceRequestCpu: "512m"
+              resourceRequestMemory: "512Mi"
+              workingDir: "/home/jenkins/agent"
+            id: "53f0c1c3fd474dc509eeea809bb96dc1e71384d0169a8d4b26be0b9bd212a962"
+            label: "jenkins-jenkins-agent"
+            name: "default"
+            nodeUsageMode: NORMAL
+            podRetention: "never"
+            serviceAccount: "default"
+            slaveConnectTimeout: 100
+            slaveConnectTimeoutStr: "100"
+            yamlMergeStrategy: "override"
+          - containers:
+            - args: "cat"
+              command: "/bin/sh -c"
+              image: "docker:latest"
+              name: "docker"
+              privileged: true
+              resourceLimitCpu: "1"
+              resourceLimitMemory: "1024Mi"
+              resourceRequestCpu: "400m"
+              resourceRequestMemory: "512Mi"
+              ttyEnabled: true
+            id: "25432981-5151-48cb-a31b-2488ed5ec44e"
+            label: "docker"
+            name: "docker"
+            volumes:
+            - hostPathVolume:
+                hostPath: "/var/run/docker.sock"
+                mountPath: "/var/run/docker.sock"
+            - hostPathVolume:
+                hostPath: "/data"
+                mountPath: "/data"
+            yamlMergeStrategy: "override"
+          - containers:
+            - args: "cat"
+              command: "/bin/sh -c"
+              image: "python:3"
+              name: "python"
+              privileged: true
+              resourceLimitCpu: "1"
+              resourceLimitMemory: "1024Mi"
+              resourceRequestCpu: "400m"
+              resourceRequestMemory: "512Mi"
+              ttyEnabled: true
+            id: "64538d04-f068-4818-a5fe-8bf2a83d3d39"
+            label: "jenkins-python"
+            name: "python"
+            serviceAccount: "jenkins"
+            yamlMergeStrategy: "override"
+      crumbIssuer:
+        standard:
+          excludeClientIPFromCrumb: true
+      disableRememberMe: false
+      labelAtoms:
+      - name: "docker"
+      - name: "jenkins-jenkins-agent"
+      - name: "jenkins-python"
+      - name: "master"
+      markupFormatter: "plainText"
+      mode: NORMAL
+      myViewsTabBar: "standard"
+      numExecutors: 0
+      primaryView:
+        all:
+          name: "all"
+      projectNamingStrategy: "standard"
+      quietPeriod: 5
+      remotingSecurity:
+        enabled: true
+      scmCheckoutRetryCount: 0
+      securityRealm:
+        local:
+          allowsSignup: false
+          enableCaptcha: false
+          users:
+          - id: "admin"
+            name: "Jenkins Admin"
+            properties:
+            - "apiToken"
+            - favoriting:
+                autofavoriteEnabled: true
+            - "mailer"
+            - "favorite"
+            - "myView"
+            - preferredProvider:
+                providerId: "default"
+            - "timezone"
+      slaveAgentPort: 50000
+      updateCenter:
+        sites:
+        - id: "default"
+          url: "https://updates.jenkins.io/update-center.json"
+      views:
+      - all:
+          name: "all"
+      viewsTabBar: "standard"
+    security:
+      apiToken:
+        creationOfLegacyTokenEnabled: false
+        tokenGenerationOnCreationEnabled: false
+        usageStatisticsEnabled: true
+      sSHD:
+        port: -1
+    unclassified:
+      bitbucketEndpointConfiguration:
+        endpoints:
+        - bitbucketCloudEndpoint:
+            enableCache: false
+            manageHooks: false
+            repositoriesCacheDuration: 0
+            teamCacheDuration: 0
+      buildDiscarders:
+        configuredBuildDiscarders:
+        - "jobBuildDiscarder"
+      fingerprints:
+        fingerprintCleanupDisabled: false
+        storage: "file"
+      gitHubConfiguration:
+        apiRateLimitChecker: ThrottleForNormalize
+      gitHubPluginConfig:
+        hookUrl: "http://jenkins.com/github-webhook/"
+      gitSCM:
+        addGitTagAction: false
+        allowSecondFetch: false
+        createAccountBasedOnEmail: false
+        disableGitToolChooser: false
+        hideCredentials: false
+        showEntireCommitSummaryInChanges: false
+        useExistingAccountWithSameEmail: false
+      junitTestResultStorage:
+        storage: "file"
+      location:
+        adminAddress: "example@mail.com"
+        url: "http://jenkins.com/"
+      mailer:
+        charset: "UTF-8"
+        useSsl: false
+        useTls: false
+      pollSCM:
+        pollingThreadCount: 10
+      sonarGlobalConfiguration:
+        buildWrapperEnabled: false
+    tool:
+      git:
+        installations:
+        - home: /usr/local/bin/git
+          name: "git"
+      mavenGlobalConfig:
+        globalSettingsProvider: "standard"
+        settingsProvider: "standard"
+
+#      jdk:
+#        defaultProperties:
+#        - installSource:
+#            installers:
+#            - jdkInstaller:
+#                acceptLicense: false

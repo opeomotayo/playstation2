@@ -1,0 +1,6 @@
+architecture: replicaset
+replicaCount: 3
+persistence:
+  storageClass: ""
+auth:
+  rootPassword: secret-root-pwd
